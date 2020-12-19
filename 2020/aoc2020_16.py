@@ -1,18 +1,28 @@
 
 import aoctools
+import re
+
+FIELD_RE = re.compile(r'(.*): (\d+)-(\d+) or (\d+)-(\d+)')
 
 
 def parse_source(raw):
+
+    def unpack_field_raw(line):
+        """
+        Parse a 'field' line into the field name and its ranges (a list
+        of 2-tuples).
+        Example:  'departure location: 29-458 or 484-956'
+        --> 'departure location', [(29, 458), (484, 956)]
+        """
+        mo = FIELD_RE.search(line)
+        return mo[1], [(int(mo[2]), int(mo[3])), (int(mo[4]), int(mo[5]))]
+
     fields_raw, my_tix_raw, csv_raw = raw.split('\n\n')
 
     fields = {}
     for line in fields_raw.split('\n'):
-        field, ranges = line.split(": ")
-        ranges = ranges.split(' or ')
-        fields[field] = []
-        for rge in ranges:
-            mn, mx = rge.split('-')
-            fields[field].append((int(mn), int(mx)))
+        field, ranges = unpack_field_raw(line)
+        fields[field] = ranges
 
     my_tix = [
         int(x) for x in my_tix_raw.replace('your ticket:\n', '').split(',')
