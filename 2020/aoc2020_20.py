@@ -75,8 +75,7 @@ class Grid:
                     row_s = row_s + ''.join(scan_line)
                 row_s = row_s + '\n'
             img = img + row_s
-        img.strip()
-        print(img)
+        img = img.strip()
         self.img = img
         return img
 
@@ -145,7 +144,7 @@ class Grid:
             """
             row = [first_tile]
 
-            # TODO: Debug -- This should not be necessary:
+            # TODO: Debug -- This loop SHOULD be redundant / unnecessary:
             for i in range(len(last_row)):
                 if i == len(last_row) - 1:
                     break
@@ -231,9 +230,6 @@ class Grid:
             used_tiles.extend(row)
             constructor.append(row)
 
-        for row in constructor:
-            self.print_row(row)
-        input()
         self.layout = constructor
         img = self.clean_assemble(constructor)
         return img
@@ -295,6 +291,8 @@ class Tile:
     # Up/Down flip, then all sides ('NS' -> flip_ns)
     XFORMS.extend(['R1,NS', 'R1', 'R1', 'R1'])
 
+    MONSTER = None
+
     def __init__(self, raw_tile: str):
         name, face = raw_tile.split(':\n')
         self.name = name.replace('Tile ', '')
@@ -304,8 +302,12 @@ class Tile:
 
         self.w = len(self.face[0])
         self.h = len(self.face)
+
         self.cached_xforms = None  # Did not end up needing cache for our data
         self.possible_matches = []
+
+        if Tile.MONSTER is None:
+            self.compile_monsters()
 
     @property
     def side_W(self):
@@ -442,6 +444,72 @@ class Tile:
         h = self.h
         print('\n'.join([''.join([fc[y][x] for x in range(w)]) for y in range(h)]))
 
+    def find_monsters(self):
+        """
+        Find and blank out all monsters in our waters.
+        """
+
+        def blank_out_monster(x_j, y_i):
+            for x, y in Tile.MONSTER:
+                self.face[y_i + y][x_j + x] = '0'
+
+        x_list = [x for x, y in Tile.MONSTER]
+        y_list = [y for x, y in Tile.MONSTER]
+
+        mn_x = min(x_list)
+        mx_x = max(x_list)
+        mn_y = min(y_list)
+        mx_y = max(y_list)
+        px_needed = len(Tile.MONSTER)
+
+        assert mn_x == 0 and mn_y == 0
+
+        i = 0
+        monster_count = 0
+        while i < self.h - mx_y:
+            j = 0
+            while j < self.w - mx_x:
+                px_spotted = 0
+                for x, y in Tile.MONSTER:
+                    if self.face[i + y][j + x] == '#':
+                        px_spotted += 1
+                if px_spotted == px_needed:
+                    monster_count += 1
+                    blank_out_monster(j, i)
+                j += 1
+            i += 1
+        return monster_count
+
+    @classmethod
+    def compile_monsters(cls):
+        '''
+        Compile the sea monsters decoder, per the pattern specified in
+        Part 2 rules.
+        '''
+
+        monster = (
+            "_                  # _\n"
+            "_#    ##    ##    ###_\n"
+            "_ #  #  #  #  #  #   _"
+        )
+
+        scanlines = [l.strip('_') for l in monster.split('\n')]
+
+        decoder = [
+            (j, i)
+            for i in range(len(scanlines))
+            for j in range(len(scanlines[0]))
+            if scanlines[i][j] == '#'
+        ]
+        Tile.MONSTER = decoder
+
+    def count_choppy_water(self):
+        tot = 0
+        for row in self.face:
+            for char in row:
+                tot += 1 if char == '#' else 0
+        return tot
+
 
 def part1(raw):
     grid = Grid(raw)
@@ -461,7 +529,17 @@ def part1(raw):
 def part2(raw):
     grid = Grid(raw)
     clean_img = grid.assemble_tiles()
-    ci = Tile(clean_img)
+    ci = Tile('Tile img:\n' + clean_img)
+
+    # Replace all 'monster' pixels with '0', flipping/rotating as needed
+    # until we start to identify them.
+    for xf in Tile.XFORMS:
+        ci.transform(xf)
+        if ci.find_monsters() > 0:
+            break
+
+    return ci.count_choppy_water()
+
 
 puz_in = aoctools.puzzle_input(2020, 20)
 test_data = '''Tile 2311:
@@ -573,6 +651,7 @@ Tile 3079:
 ..#.###...'''
 
 aoctools.test(1, part1, test_data, 20899048083289)
+aoctools.test(2, part2, test_data, 273)
 
 aoctools.submit(1, part1, puz_in)
-input()
+aoctools.submit(2, part2, puz_in)
