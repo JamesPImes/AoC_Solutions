@@ -2,57 +2,75 @@
 import aoctools
 
 
-def rotate_to_val(a_list: list, target=1):
-    """
-    'Rotate' our list until the `target` value is at index 0. Returns a
-    new list.
-    """
-    return rotate_by_n(a_list, a_list.index(target))
+def new_round(links, current):
+    h1 = links[current]
+    h2 = links[h1]
+    h3 = links[h2]
+    links[current] = links[h3]
 
-
-def rotate_by_n(a_list: list, n=1):
-    """
-    'Rotate' our list clockwise by `n` notches. Returns a new list.
-    """
-    return a_list[n:] + a_list[:n]
-
-
-def new_round(cups: list):
-    hold_cups, remaining_cups = cups[1:4], cups[:1] + cups[4:]
-
-    destination = cups[0] - 1
+    destination_cup = current - 1
     while True:
-        if destination < min(remaining_cups):
-            destination = max(remaining_cups)
-        try:
-            i = remaining_cups.index(destination)
+        if destination_cup < 1:
+            destination_cup = max(links.keys())
+        if destination_cup not in [h1, h2, h3]:
             break
-        except ValueError:
-            destination -= 1
+        destination_cup -= 1
 
-    cups = remaining_cups[:i + 1] + hold_cups + remaining_cups[i + 1:]
+    links[h3] = links[destination_cup]
+    links[destination_cup] = h1
+    return links[current]
 
-    # Rotate by 1 to set up the next round.
-    cups = rotate_by_n(cups, 1)
-    return cups
+
+def gen_pointers(cups: list):
+    """
+    Generate a dict of pointers from each cup to the next cup
+    (clockwise).
+    """
+    points_to = {cups[i]: cups[i + 1] for i in range(len(cups) - 1)}
+
+    # Circular, so link last item to first item.
+    points_to[int(cups[-1])] = int(cups[0])
+
+    return points_to
 
 
 def part1(raw, rounds=100):
     cups = [int(x) for x in list(raw)]
+    points_to = gen_pointers(cups)
 
+    current_cup = cups[0]
     for _ in range(rounds):
-        cups = new_round(cups)
+        current_cup = new_round(points_to, current_cup)
 
-    cups = rotate_to_val(cups, 1)
+    current_cup = points_to[1]
+    final_order = f"{current_cup}"
+    for _ in range(len(cups) - 2):
+        current_cup = points_to[current_cup]
+        final_order = f"{final_order}{current_cup}"
 
-    return ''.join([str(c) for c in cups[1:]])
+    return final_order
+
+
+def part2(raw, rounds=10000000):
+    total_cups = 1000000
+    cups = [x + 1 if x >= len(raw) else int(raw[x]) for x in range(total_cups)]
+    points_to = gen_pointers(cups)
+
+    current_cup = cups[0]
+    for _ in range(rounds):
+        current_cup = new_round(points_to, current_cup)
+
+    num_1 = points_to[1]
+    num_2 = points_to[num_1]
+
+    return num_1 * num_2
 
 
 puz_in = aoctools.puzzle_input(2020, 23)
 test_data = '''389125467'''
 
 aoctools.test(1, part1, test_data, '67384529')
-# aoctools.test(2, part2, test_data, 0)
+aoctools.test(2, part2, test_data, 149245887792)
 
 aoctools.submit(1, part1, puz_in)
-# aoctools.submit(2, part2, puz_in)
+aoctools.submit(2, part2, puz_in)
